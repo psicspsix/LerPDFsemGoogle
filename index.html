@@ -3,225 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador de PDFs do Google Drive</title>
-    <link rel="icon" href="https://raw.githubusercontent.com/psicspsix/Jogo-de-Forca/main/psicspsix.ico">
+    <title>Visualizador de Arquivos pCloud</title>
     <style>
         body {
-            background-color: #000000;
-            color: #ffffff;
-            height: 100vh;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             font-family: Arial, sans-serif;
-            overflow: auto;
-        }
-        #container {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 10px;
-            width: 600px;
-            text-align: center;
+            background-color: #f0f0f0;
+            margin: 20px;
         }
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
+            text-align: center;
         }
-        button {
-            background-color: #333333;
-            color: #ffffff;
-            border: none;
-            padding: 10px 20px;
-            margin: 10px;
-            font-size: 1.2em;
-            cursor: pointer;
-            border-radius: 5px;
+        #fileList a {
+            display: block;
+            margin: 10px 0;
+            color: #0078d4;
+            text-decoration: none;
         }
-        button:hover {
-            background-color: #555555;
+        #fileList a:hover {
+            text-decoration: underline;
         }
-        #fileList {
-            margin-top: 20px;
-            text-align: left;
-        }
-        .file-item {
-            padding: 10px;
-            margin: 5px 0;
-            background: #333333;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .file-item:hover {
-            background: #555555;
-        }
-        #mensagem {
-            font-size: 18px;
-            color: #ffff00;
-            margin-top: 20px;
+        #loading {
+            color: #666;
+            font-size: 16px;
         }
         #erroMensagem {
-            font-size: 16px;
             color: #ff0000;
-            margin-top: 10px;
+            font-size: 16px;
+        }
+        iframe {
+            width: 100%;
+            height: 80vh;
+            border: none;
+            margin-top: 20px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <h1>Arquivos PDF da Pasta</h1>
-        <button id="authBtn">Autenticar com Google</button>
-        <div id="fileList"></div>
-        <p id="mensagem"></p>
-        <p id="erroMensagem"></p>
+    <h1>Meus Arquivos no pCloud</h1>
+    <div id="fileList">
+        <p id="loading">Carregando arquivos...</p>
     </div>
+    <p id="erroMensagem"></p>
+    <iframe id="fileViewer" title="Visualizador de Arquivos"></iframe>
 
-    <script src="https://apis.google.com/js/api.js" onload="console.log('gapi carregado com sucesso')" onerror="console.error('Falha ao carregar gapi'); document.getElementById('erroMensagem').textContent = 'Erro: Não foi possível carregar a biblioteca do Google.';"></script>
     <script>
-        const API_KEY = 'SUA_CHAVE_API'; // Substitua pela sua chave de API
-        const CLIENT_ID = 'SEU_CLIENT_ID'; // Substitua pelo seu Client ID
-        const FOLDER_ID = '1ynkQTUmElZDMwEITFdc8SZ4MJoDmWUe6';
-        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
-        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        const FOLDER_CODE = 'kZTxFB5Z8VYGOEbySCYBH6FWHRjDephcFSey'; // Código da sua pasta pública
 
-        let isSignedIn = false;
-
-        function initClient() {
-            console.log('Iniciando gapi.load');
-            if (!window.gapi) {
-                console.error('gapi não está definido');
-                document.getElementById('erroMensagem').textContent = 'Erro: Biblioteca gapi não carregada.';
-                return;
-            }
-            gapi.load('client:auth2', () => {
-                console.log('gapi.client:auth2 carregado');
-                if (!gapi.client) {
-                    console.error('gapi.client não está definido');
-                    document.getElementById('erroMensagem').textContent = 'Erro: Módulo client não carregado.';
-                    return;
-                }
-                gapi.client.init({
-                    apiKey: API_KEY,
-                    clientId: CLIENT_ID,
-                    discoveryDocs: DISCOVERY_DOCS,
-                    scope: SCOPES
-                }).then(() => {
-                    console.log('gapi.client.init sucesso');
-                    const authInstance = gapi.auth2.getAuthInstance();
-                    if (!authInstance) {
-                        console.error('gapi.auth2.getAuthInstance falhou');
-                        document.getElementById('erroMensagem').textContent = 'Erro: Instância de autenticação não disponível.';
-                        return;
+        function loadFiles() {
+            const url = `https://api.pcloud.com/listfolder?code=${FOLDER_CODE}`;
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro na requisição: ' + response.status);
                     }
-                    authInstance.isSignedIn.listen(updateSigninStatus);
-                    updateSigninStatus(authInstance.isSignedIn.get());
-                    document.getElementById('authBtn').addEventListener('click', handleAuthClick);
-                }).catch(error => {
-                    console.error('Erro ao inicializar cliente:', error);
-                    const errorMessage = error.error || 'Indefinido';
-                    const errorDetails = error.details || JSON.stringify(error);
-                    document.getElementById('erroMensagem').textContent = `Erro ao inicializar cliente: ${errorMessage} - ${errorDetails}`;
+                    return response.json();
+                })
+                .then(data => {
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = ''; // Remove o "Carregando..."
+                    if (data.contents && data.contents.length > 0) {
+                        data.contents.forEach(file => {
+                            if (file.isfolder) return; // Ignora pastas
+                            const link = document.createElement('a');
+                            link.href = '#';
+                            link.textContent = file.name;
+                            link.onclick = () => {
+                                const fileUrl = `https://u.pcloud.link/publink/show?code=${FOLDER_CODE}&path=/${file.name}`;
+                                document.getElementById('fileViewer').src = fileUrl;
+                                document.getElementById('fileViewer').style.display = 'block';
+                            };
+                            fileList.appendChild(link);
+                        });
+                    } else {
+                        fileList.innerHTML = '<p>Nenhum arquivo encontrado na pasta.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    document.getElementById('erroMensagem').textContent = 'Erro ao carregar os arquivos. Pode ser necessário configurar uma chave de API.';
                 });
-            }, error => {
-                console.error('Erro ao carregar client:auth2:', error);
-                document.getElementById('erroMensagem').textContent = 'Erro: Não foi possível carregar o módulo client:auth2.';
-            });
         }
 
-        function updateSigninStatus(signedIn) {
-            isSignedIn = signedIn;
-            const authBtn = document.getElementById('authBtn');
-            const fileList = document.getElementById('fileList');
-            const mensagem = document.getElementById('mensagem');
-            if (signedIn) {
-                authBtn.style.display = 'none';
-                mensagem.textContent = 'Carregando arquivos...';
-                listarArquivos();
-            } else {
-                authBtn.style.display = 'block';
-                fileList.innerHTML = '';
-                mensagem.textContent = 'Por favor, autentique-se para ver os arquivos.';
-            }
-        }
-
-        function handleAuthClick() {
-            console.log('Botão de autenticação clicado');
-            if (!gapi.auth2) {
-                console.error('gapi.auth2 não está definido');
-                document.getElementById('erroMensagem').textContent = 'Erro: Módulo de autenticação não carregado.';
-                return;
-            }
-            if (isSignedIn) {
-                gapi.auth2.getAuthInstance().signOut().then(() => {
-                    console.log('Usuário desconectado');
-                }).catch(error => {
-                    console.error('Erro ao desconectar:', error);
-                    document.getElementById('erroMensagem').textContent = `Erro ao desconectar: ${error.error || JSON.stringify(error)}`;
-                });
-            } else {
-                gapi.auth2.getAuthInstance().signIn().then(() => {
-                    console.log('Usuário autenticado com sucesso');
-                }).catch(error => {
-                    console.error('Erro ao autenticar:', error);
-                    document.getElementById('erroMensagem').textContent = `Erro ao autenticar: ${error.error || JSON.stringify(error)}`;
-                });
-            }
-        }
-
-        async function listarArquivos() {
-            try {
-                console.log('Listando arquivos da pasta:', FOLDER_ID);
-                const response = await gapi.client.drive.files.list({
-                    q: `'${FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false`,
-                    fields: 'files(id, name, webViewLink)',
-                    spaces: 'drive'
-                });
-                console.log('Resposta da API:', response.result);
-                const files = response.result.files;
-                const fileList = document.getElementById('fileList');
-                const mensagem = document.getElementById('mensagem');
-                const erroMensagem = document.getElementById('erroMensagem');
-
-                fileList.innerHTML = '';
-                erroMensagem.textContent = '';
-
-                if (files && files.length > 0) {
-                    mensagem.textContent = `Encontrados ${files.length} arquivos PDF:`;
-                    files.forEach(file => {
-                        const div = document.createElement('div');
-                        div.className = 'file-item';
-                        div.textContent = file.name;
-                        div.onclick = () => {
-                            console.log(`Abrindo PDF: ${file.name} (${file.webViewLink})`);
-                            window.open(file.webViewLink, '_blank');
-                        };
-                        fileList.appendChild(div);
-                    });
-                } else {
-                    mensagem.textContent = 'Nenhum arquivo PDF encontrado na pasta.';
-                }
-            } catch (error) {
-                console.error('Erro ao listar arquivos:', error);
-                document.getElementById('erroMensagem').textContent = `Erro ao listar arquivos: ${error.error || JSON.stringify(error)}`;
-                document.getElementById('mensagem').textContent = '';
-            }
-        }
-
-        // Verificar se gapi está disponível antes de inicializar
-        if (window.gapi) {
-            console.log('gapi disponível, iniciando cliente');
-            initClient();
-        } else {
-            console.error('gapi não está disponível ao iniciar');
-            document.getElementById('erroMensagem').textContent = 'Erro: Biblioteca gapi não carregada. Verifique a conexão ou bloqueadores.';
-            // Tentar recarregar a biblioteca após um atraso
-            setTimeout(() => {
-                if (window.gapi) {
-                    console.log('gapi disponível após retry');
-                    initClient();
-                }
-            }, 2000);
-        }
+        loadFiles();
     </script>
 </body>
 </html>
