@@ -4,31 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizador de Arquivos pCloud</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/psicspsix/Jogo-de-Forca/main/psicspsix.ico">
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
+            background-color: #121212; /* Fundo escuro */
+            color: #e0e0e0; /* Texto claro */
+            line-height: 1.6;
+        }
+        .container {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
         }
         h1 {
-            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+        #fileList {
+            margin-top: 20px;
         }
         #fileList a {
             display: block;
             margin: 10px 0;
-            color: #0078d4;
+            font-size: 18px;
+            color: #4db8ff;
             text-decoration: none;
+            padding: 10px;
+            background: #333333;
+            border-radius: 5px;
         }
         #fileList a:hover {
             text-decoration: underline;
+            background: #555555;
         }
         #loading {
-            color: #666;
+            color: #b3b3b3;
             font-size: 16px;
         }
         #erroMensagem {
             color: #ff0000;
             font-size: 16px;
+            margin-top: 20px;
         }
         iframe {
             width: 100%;
@@ -40,51 +60,69 @@
     </style>
 </head>
 <body>
-    <h1>Meus Arquivos no pCloud</h1>
-    <div id="fileList">
-        <p id="loading">Carregando arquivos...</p>
+    <div class="container">
+        <h1>Arquivos da Pasta pCloud</h1>
+        <div id="fileList">
+            <p id="loading">Carregando arquivos...</p>
+        </div>
+        <p id="erroMensagem"></p>
+        <iframe id="fileViewer" title="Visualizador de Arquivos"></iframe>
     </div>
-    <p id="erroMensagem"></p>
-    <iframe id="fileViewer" title="Visualizador de Arquivos"></iframe>
 
     <script>
-        const FOLDER_CODE = 'kZTxFB5Z8VYGOEbySCYBH6FWHRjDephcFSey'; // Código da sua pasta pública
+        const FOLDER_CODE = 'kZTxFB5Z8VYGOEbySCYBH6FWHRjDephcFSey'; // Código da pasta pública
+        const CLIENT_ID = 'YOUR_CLIENT_ID'; // Substitua pelo seu Client ID (opcional, deixe como está se não tiver)
 
         function loadFiles() {
-            const url = `https://api.pcloud.com/listfolder?code=${FOLDER_CODE}`;
+            let url = `https://api.pcloud.com/listfolder?code=${FOLDER_CODE}`;
+            if (CLIENT_ID !== 'YOUR_CLIENT_ID') {
+                url += `&client_id=${CLIENT_ID}`;
+            }
+            console.log('Requisição à API:', url);
             fetch(url)
                 .then(response => {
+                    console.log('Status da resposta:', response.status);
                     if (!response.ok) {
-                        throw new Error('Erro na requisição: ' + response.status);
+                        throw new Error(`Erro na requisição: ${response.status} - ${response.statusText}`);
                     }
                     return response.json();
                 })
                 .then(data => {
+                    console.log('Resposta da API:', data);
                     const fileList = document.getElementById('fileList');
+                    const erroMensagem = document.getElementById('erroMensagem');
                     fileList.innerHTML = ''; // Remove o "Carregando..."
-                    if (data.contents && data.contents.length > 0) {
-                        data.contents.forEach(file => {
-                            if (file.isfolder) return; // Ignora pastas
-                            const link = document.createElement('a');
-                            link.href = '#';
-                            link.textContent = file.name;
-                            link.onclick = () => {
-                                const fileUrl = `https://u.pcloud.link/publink/show?code=${FOLDER_CODE}&path=/${file.name}`;
-                                document.getElementById('fileViewer').src = fileUrl;
-                                document.getElementById('fileViewer').style.display = 'block';
-                            };
-                            fileList.appendChild(link);
-                        });
+                    erroMensagem.textContent = '';
+
+                    if (data.result === 0 && data.metadata && data.metadata.contents) {
+                        const files = data.metadata.contents.filter(file => !file.isfolder); // Filtra apenas arquivos
+                        if (files.length > 0) {
+                            files.forEach(file => {
+                                const link = document.createElement('a');
+                                link.href = '#';
+                                link.textContent = file.name;
+                                link.onclick = () => {
+                                    const fileUrl = `https://u.pcloud.link/publink/show?code=${FOLDER_CODE}&path=/${encodeURIComponent(file.name)}`;
+                                    console.log('Abrindo arquivo:', fileUrl);
+                                    document.getElementById('fileViewer').src = fileUrl;
+                                    document.getElementById('fileViewer').style.display = 'block';
+                                };
+                                fileList.appendChild(link);
+                            });
+                        } else {
+                            fileList.innerHTML = '<p>Nenhum arquivo encontrado na pasta.</p>';
+                        }
                     } else {
-                        fileList.innerHTML = '<p>Nenhum arquivo encontrado na pasta.</p>';
+                        throw new Error(`Erro na API: ${data.error || 'Resposta inválida'}`);
                     }
                 })
                 .catch(error => {
-                    console.error('Erro:', error);
-                    document.getElementById('erroMensagem').textContent = 'Erro ao carregar os arquivos. Pode ser necessário configurar uma chave de API.';
+                    console.error('Erro ao carregar arquivos:', error);
+                    document.getElementById('erroMensagem').textContent = `Erro ao carregar os arquivos: ${error.message}. Verifique a conexão ou o Client ID.`;
                 });
         }
 
+        // Iniciar o carregamento dos arquivos
         loadFiles();
     </script>
 </body>
