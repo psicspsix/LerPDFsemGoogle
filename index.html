@@ -76,7 +76,7 @@
         <p id="erroMensagem"></p>
     </div>
 
-    <script src="https://apis.google.com/js/api.js" onload="console.log('gapi carregado com sucesso')" onerror="console.error('Falha ao carregar gapi'); document.getElementById('erroMensagem').textContent = 'Erro ao carregar biblioteca do Google.';"></script>
+    <script src="https://apis.google.com/js/api.js" onload="console.log('gapi carregado com sucesso')" onerror="console.error('Falha ao carregar gapi'); document.getElementById('erroMensagem').textContent = 'Erro: Não foi possível carregar a biblioteca do Google.';"></script>
     <script>
         const API_KEY = 'SUA_CHAVE_API'; // Substitua pela sua chave de API
         const CLIENT_ID = 'SEU_CLIENT_ID'; // Substitua pelo seu Client ID
@@ -88,13 +88,18 @@
 
         function initClient() {
             console.log('Iniciando gapi.load');
-            if (!gapi) {
+            if (!window.gapi) {
                 console.error('gapi não está definido');
                 document.getElementById('erroMensagem').textContent = 'Erro: Biblioteca gapi não carregada.';
                 return;
             }
             gapi.load('client:auth2', () => {
                 console.log('gapi.client:auth2 carregado');
+                if (!gapi.client) {
+                    console.error('gapi.client não está definido');
+                    document.getElementById('erroMensagem').textContent = 'Erro: Módulo client não carregado.';
+                    return;
+                }
                 gapi.client.init({
                     apiKey: API_KEY,
                     clientId: CLIENT_ID,
@@ -102,16 +107,24 @@
                     scope: SCOPES
                 }).then(() => {
                     console.log('gapi.client.init sucesso');
-                    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-                    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                    const authInstance = gapi.auth2.getAuthInstance();
+                    if (!authInstance) {
+                        console.error('gapi.auth2.getAuthInstance falhou');
+                        document.getElementById('erroMensagem').textContent = 'Erro: Instância de autenticação não disponível.';
+                        return;
+                    }
+                    authInstance.isSignedIn.listen(updateSigninStatus);
+                    updateSigninStatus(authInstance.isSignedIn.get());
                     document.getElementById('authBtn').addEventListener('click', handleAuthClick);
                 }).catch(error => {
                     console.error('Erro ao inicializar cliente:', error);
-                    document.getElementById('erroMensagem').textContent = `Erro ao inicializar cliente: ${error.error || 'Indefinido'} - ${error.details || JSON.stringify(error)}`;
+                    const errorMessage = error.error || 'Indefinido';
+                    const errorDetails = error.details || JSON.stringify(error);
+                    document.getElementById('erroMensagem').textContent = `Erro ao inicializar cliente: ${errorMessage} - ${errorDetails}`;
                 });
             }, error => {
                 console.error('Erro ao carregar client:auth2:', error);
-                document.getElementById('erroMensagem').textContent = 'Erro ao carregar módulo client:auth2.';
+                document.getElementById('erroMensagem').textContent = 'Erro: Não foi possível carregar o módulo client:auth2.';
             });
         }
 
@@ -147,7 +160,7 @@
                 });
             } else {
                 gapi.auth2.getAuthInstance().signIn().then(() => {
-                    console.log('Usuário autenticado');
+                    console.log('Usuário autenticado com sucesso');
                 }).catch(error => {
                     console.error('Erro ao autenticar:', error);
                     document.getElementById('erroMensagem').textContent = `Erro ao autenticar: ${error.error || JSON.stringify(error)}`;
@@ -194,12 +207,20 @@
             }
         }
 
-        // Inicializar a API após o carregamento do script
+        // Verificar se gapi está disponível antes de inicializar
         if (window.gapi) {
+            console.log('gapi disponível, iniciando cliente');
             initClient();
         } else {
             console.error('gapi não está disponível ao iniciar');
-            document.getElementById('erroMensagem').textContent = 'Erro: Biblioteca gapi não carregada.';
+            document.getElementById('erroMensagem').textContent = 'Erro: Biblioteca gapi não carregada. Verifique a conexão ou bloqueadores.';
+            // Tentar recarregar a biblioteca após um atraso
+            setTimeout(() => {
+                if (window.gapi) {
+                    console.log('gapi disponível após retry');
+                    initClient();
+                }
+            }, 2000);
         }
     </script>
 </body>
