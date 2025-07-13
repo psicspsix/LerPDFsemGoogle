@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador de Arquivos pCloud</title>
-    <link rel="icon" href="https://raw.githubusercontent.com/psicspsix/Jogo-de-Forca/main/psicspsix.ico">
+    <title>Visualizador de PDF</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -19,111 +18,128 @@
             padding: 20px;
             text-align: center;
         }
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            color: #ffffff;
-        }
-        #fileList {
-            margin-top: 20px;
-        }
-        #fileList a {
-            display: block;
-            margin: 10px 0;
-            font-size: 18px;
-            color: #4db8ff;
-            text-decoration: none;
+        input {
+            width: 80%;
             padding: 10px;
-            background: #333333;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #121212; /* Texto escuro para contraste */
+            background-color: #e0e0e0; /* Fundo claro para contraste */
+            border: none;
             border-radius: 5px;
         }
-        #fileList a:hover {
-            text-decoration: underline;
-            background: #555555;
-        }
-        #loading {
-            color: #b3b3b3;
+        button {
+            padding: 10px 20px;
             font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
         }
-        #erroMensagem {
-            color: #ff0000;
-            font-size: 16px;
-            margin-top: 20px;
+        button:hover {
+            background-color: #0056b3;
         }
         iframe {
             width: 100%;
-            height: 80vh;
+            height: 100vh;
             border: none;
+            display: none; /* Inicialmente escondido */
+        }
+        h2 {
             margin-top: 20px;
-            display: none;
+            font-size: 20px;
+            color: #ffffff;
+        }
+        a {
+            display: block;
+            margin: 5px 0;
+            font-size: 16px;
+            color: #4db8ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .note {
+            font-size: 12px;
+            margin: 20px;
+            padding: 10px;
+            color: #b3b3b3;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Arquivos da Pasta pCloud</h1>
-        <div id="fileList">
-            <p id="loading">Carregando arquivos...</p>
-        </div>
-        <p id="erroMensagem"></p>
-        <iframe id="fileViewer" title="Visualizador de Arquivos"></iframe>
+    <div class="container" id="controls">
+        <h1>VISUALIZADOR DE PDFs PARA NAVEGADORES LIMITADOS</h1>
+        <!-- Campo para links -->
+        <input type="text" id="pdf-url" placeholder="Insira o link do PDF" />
+        <button onclick="loadPDF()">Abrir PDF por URL</button>
+        <p>OU</p>
+        <!-- Campo para upload de arquivos -->
+        <input type="file" id="pdf-file" accept="application/pdf" />
+        <button onclick="uploadPDF()">Abrir PDF Local</button>
+        <h2>ARQUIVOS PDF DA PASTA DO GOOGLE DRIVE</h2>
+        <p class="small-note">(Clique nos links abaixo para visualizar os PDFs)</p>
+        <!-- Lista de PDFs do Google Drive -->
+        <a href="#" onclick="openPDF('https://drive.google.com/file/d/FILE_ID_1/preview')">Nome do PDF 1</a>
+        <a href="#" onclick="openPDF('https://drive.google.com/file/d/FILE_ID_2/preview')">Nome do PDF 2</a>
+        <a href="#" onclick="openPDF('https://drive.google.com/file/d/FILE_ID_3/preview')">Nome do PDF 3</a>
+        <!-- Adicione mais links conforme necessário -->
     </div>
-
+    <iframe id="pdf-viewer" src="" title="Visualizador de PDF"></iframe>
+    <div class="note">
+        <p>
+            Este site foi desenvolvido para atender a uma necessidade específica: visualizar arquivos PDF diretamente em navegadores simples, como aqueles encontrados em Smart TVs ou dispositivos como o Alexa Echo Show. Muitos navegadores desses dispositivos não permitem a instalação de aplicativos adicionais nem oferecem suporte completo a recursos avançados de visualização de PDF.
+        </p>
+        <p>
+            Importante: o endereço inserido deve apontar diretamente para o arquivo PDF (ou seja, deve terminar em ".pdf"). Links compartilhados de serviços como Google Drive ou Dropbox geralmente não funcionam diretamente, pois exigem processamento adicional. Para PDFs do Google Drive, use os links da lista abaixo.
+        </p>
+        <p>
+            Este site não armazena arquivos nem faz download automático. Ele apenas oferece uma interface simples para visualização, garantindo que dispositivos com recursos limitados possam acessar arquivos PDF sem problemas.
+        </p>
+    </div>
     <script>
-        const FOLDER_CODE = 'kZTxFB5Z8VYGOEbySCYBH6FWHRjDephcFSey'; // Código da pasta pública
-        const CLIENT_ID = 'YOUR_CLIENT_ID'; // Substitua pelo seu Client ID (opcional, deixe como está se não tiver)
-
-        function loadFiles() {
-            let url = `https://api.pcloud.com/listfolder?code=${FOLDER_CODE}`;
-            if (CLIENT_ID !== 'YOUR_CLIENT_ID') {
-                url += `&client_id=${CLIENT_ID}`;
+        function loadPDF() {
+            const url = document.getElementById('pdf-url').value;
+            const viewer = document.getElementById('pdf-viewer');
+            const controls = document.getElementById('controls');
+            if (url) {
+                viewer.src = url;
+                viewer.style.display = 'block'; // Mostra o PDF
+                controls.style.display = 'none'; // Esconde os controles
+            } else {
+                alert('Por favor, insira um link válido.');
             }
-            console.log('Requisição à API:', url);
-            fetch(url)
-                .then(response => {
-                    console.log('Status da resposta:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`Erro na requisição: ${response.status} - ${response.statusText}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Resposta da API:', data);
-                    const fileList = document.getElementById('fileList');
-                    const erroMensagem = document.getElementById('erroMensagem');
-                    fileList.innerHTML = ''; // Remove o "Carregando..."
-                    erroMensagem.textContent = '';
-
-                    if (data.result === 0 && data.metadata && data.metadata.contents) {
-                        const files = data.metadata.contents.filter(file => !file.isfolder); // Filtra apenas arquivos
-                        if (files.length > 0) {
-                            files.forEach(file => {
-                                const link = document.createElement('a');
-                                link.href = '#';
-                                link.textContent = file.name;
-                                link.onclick = () => {
-                                    const fileUrl = `https://u.pcloud.link/publink/show?code=${FOLDER_CODE}&path=/${encodeURIComponent(file.name)}`;
-                                    console.log('Abrindo arquivo:', fileUrl);
-                                    document.getElementById('fileViewer').src = fileUrl;
-                                    document.getElementById('fileViewer').style.display = 'block';
-                                };
-                                fileList.appendChild(link);
-                            });
-                        } else {
-                            fileList.innerHTML = '<p>Nenhum arquivo encontrado na pasta.</p>';
-                        }
-                    } else {
-                        throw new Error(`Erro na API: ${data.error || 'Resposta inválida'}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar arquivos:', error);
-                    document.getElementById('erroMensagem').textContent = `Erro ao carregar os arquivos: ${error.message}. Verifique a conexão ou o Client ID.`;
-                });
         }
 
-        // Iniciar o carregamento dos arquivos
-        loadFiles();
+        function uploadPDF() {
+            const fileInput = document.getElementById('pdf-file');
+            const viewer = document.getElementById('pdfSyndrome('pdf-viewer');
+            const controls = document.getElementById('controls');
+            const file = fileInput.files[0];
+
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                viewer.src = fileURL;
+                viewer.style.display = 'block'; // Mostra o PDF
+                controls.style.display = 'none'; // Esconde os controles
+            } else {
+                alert('Por favor, selecione um arquivo PDF.');
+            }
+        }
+
+        function openPDF(url) {
+            const viewer = document.getElementById('pdf-viewer');
+            const controls = document.getElementById('controls');
+            viewer.src = url;
+            viewer.style.display = 'block'; // Mostra o PDF
+            controls.style.display = 'none'; // Esconde os controles
+        }
     </script>
 </body>
 </html>
